@@ -32,21 +32,112 @@ function DecisionNode({
 }: {
   data: DecisionNodeData;
 }) {
+  // Check what decision the AI made
+  const hasYesDecision = data.decision === "YES";
+  const hasNoDecision = data.decision === "NO";
+
   return (
     <div
       style={{
-        padding: "12px",
+        // Give the node internal space
+        padding: "15px",
+
+        // Make the node look like a card
         border: "2px solid #333",
-        borderRadius: "8px",
-        background: "white",
-        minWidth: "220px",
+        borderRadius: "12px",
+        background: "#ffffff",
+
+        // Set the minimum width
+        minWidth: "240px",
+
+        // Add a small shadow
+        boxShadow:
+          "0 4px 12px rgba(0, 0, 0, 0.12)",
       }}
     >
-      {/* Target handle allows another node to connect INTO this node */}
+      {/* Incoming connection point */}
       <Handle
         type="target"
         position={Position.Top}
+        style={{
+          width: "10px",
+          height: "10px",
+        }}
       />
+
+      {/* Node title */}
+      <div
+        style={{
+          fontSize: "16px",
+          fontWeight: "bold",
+          marginBottom: "10px",
+        }}
+      >
+        🤖 {data.label}
+      </div>
+
+      {/* AI decision question */}
+      <p
+        style={{
+          marginTop: "8px",
+          marginBottom: "12px",
+          fontSize: "14px",
+          lineHeight: "1.4",
+        }}
+      >
+        {data.prompt}
+      </p>
+
+      {/* Display the AI decision */}
+      <div
+        style={{
+          padding: "8px",
+          borderRadius: "6px",
+
+          // Change the background depending on the decision
+          background: hasYesDecision
+            ? "#eaffea"
+            : hasNoDecision
+              ? "#ffeaea"
+              : "#f3f3f3",
+
+          textAlign: "center",
+          fontSize: "13px",
+          marginBottom: "12px",
+        }}
+      >
+        Decision:{" "}
+        <strong
+          style={{
+            color: hasYesDecision
+              ? "green"
+              : hasNoDecision
+                ? "red"
+                : "#555",
+          }}
+        >
+          {data.decision || "Not tested"}
+        </strong>
+      </div>
+
+      {/* Show the available paths */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: "12px",
+          fontWeight: "bold",
+          marginTop: "5px",
+        }}
+      >
+        <span style={{ color: "green" }}>
+          YES
+        </span>
+
+        <span style={{ color: "red" }}>
+          NO
+        </span>
+      </div>
 
       {/* YES connection point */}
       <Handle
@@ -55,6 +146,9 @@ function DecisionNode({
         id="yes"
         style={{
           left: "30%",
+          background: "green",
+          width: "12px",
+          height: "12px",
         }}
       />
 
@@ -65,42 +159,21 @@ function DecisionNode({
         id="no"
         style={{
           left: "70%",
+          background: "red",
+          width: "12px",
+          height: "12px",
         }}
       />
-
-      {/* Node title */}
-      <strong>{data.label}</strong>
-
-      {/* Decision question */}
-      <p
-        style={{
-          marginTop: "8px",
-          marginBottom: "8px",
-        }}
-      >
-        {data.prompt}
-      </p>
-
-      {/* Display the AI decision */}
-      <p>
-        Decision:{" "}
-        <strong>
-          {data.decision || "Not tested"}
-        </strong>
-      </p>
-
-      {/* Show the available paths */}
-      <small>YES / NO paths</small>
     </div>
   );
 }
 
-// Tell React Flow which component represents our decision nodes
+// Tell React Flow which component represents decision nodes
 const nodeTypes = {
   decision: DecisionNode,
 };
 
-// Create our starting nodes
+// Create our starting workflow nodes
 const initialNodes: Node[] = [
   {
     id: "1",
@@ -111,7 +184,8 @@ const initialNodes: Node[] = [
     },
     data: {
       label: "AI Decision 1",
-      prompt: "Is this a customer support request?",
+      prompt:
+        "Is this a customer support request?",
     },
   },
 
@@ -174,7 +248,7 @@ const initialNodes: Node[] = [
   },
 ];
 
-// Create our starting connections
+// Create our starting workflow connections
 const initialEdges: Edge[] = [
   {
     id: "yes-edge",
@@ -216,11 +290,11 @@ const initialEdges: Edge[] = [
 ];
 
 export default function WorkflowCanvas() {
-  // Store our nodes
+  // Store our workflow nodes
   const [nodes, setNodes, onNodesChange] =
     useNodesState(initialNodes);
 
-  // Store our edges
+  // Store our workflow edges
   const [edges, setEdges, onEdgesChange] =
     useEdgesState(initialEdges);
 
@@ -228,7 +302,7 @@ export default function WorkflowCanvas() {
   const [aiDecision, setAiDecision] =
     useState<string>("Not tested");
 
-  // Store the node currently being highlighted
+  // Store the node currently highlighted
   const [activeNode, setActiveNode] =
     useState<string | null>(null);
 
@@ -236,15 +310,19 @@ export default function WorkflowCanvas() {
   const [selectedNode, setSelectedNode] =
     useState<string | null>(null);
 
-  // Store the edge currently being highlighted
+  // Store the edge currently highlighted
   const [activeEdge, setActiveEdge] =
     useState<string | null>(null);
 
-  // Store the order in which decision nodes are executed
+  // Store the order of executed decision nodes
   const [executionLog, setExecutionLog] =
     useState<string[]>([]);
 
-  // Allow users to connect nodes together
+  // Store previous workflow executions
+  const [executionHistory, setExecutionHistory] =
+    useState<string[][]>([]);
+
+  // Allow users to create new connections
   const onConnect = (connection: Connection) => {
     setEdges((currentEdges) =>
       addEdge(connection, currentEdges)
@@ -260,17 +338,20 @@ export default function WorkflowCanvas() {
     const newNode: Node = {
       id: newNodeId,
       type: "decision",
+
       position: {
         x: 500,
         y: 100 + nodes.length * 100,
       },
+
       data: {
         label: "New AI Decision",
-        prompt: "Enter your decision question",
+        prompt:
+          "Enter your decision question",
       },
     };
 
-    // Add the new node to our existing nodes
+    // Add the new node
     setNodes((currentNodes) => [
       ...currentNodes,
       newNode,
@@ -281,310 +362,505 @@ export default function WorkflowCanvas() {
   const testAI = async () => {
     console.log("Test AI button clicked");
 
-    // Clear the previous execution history
+    // Clear the previous execution
     setExecutionLog([]);
 
-    // Clear the previous active node and edge
+    // Clear previous highlights
     setActiveNode(null);
     setActiveEdge(null);
 
-    // Show that the workflow is currently running
+    // Show that the workflow is running
     setAiDecision("Testing...");
 
-    // Send the current React Flow workflow to our Next.js API
-    const response = await fetch(
-      "http://localhost:3000/api/test-workflow",
-      {
-        method: "POST",
+    try {
+      // Send the workflow to our Next.js API
+      const response = await fetch(
+        "http://localhost:3000/api/test-workflow",
+        {
+          method: "POST",
 
-        // Tell Next.js we are sending JSON
-        headers: {
-          "Content-Type": "application/json",
-        },
+          // Tell the API we are sending JSON
+          headers: {
+            "Content-Type": "application/json",
+          },
 
-        // Send the current workflow information
-        body: JSON.stringify({
-          // Node where the workflow starts
-          nodeId: "1",
+          // Send the workflow information
+          body: JSON.stringify({
+            // Start the workflow at Node 1
+            nodeId: "1",
 
-          // Message that the AI should evaluate
-          message:
-            "My account is not working and I need help from customer support.",
+            // Message that the AI evaluates
+            message:
+              "My account is not working and I need help from customer support.",
 
-          // Send the current React Flow nodes
-          // This includes any prompt changes
-          nodes: nodes.map((node) => ({
-            id: node.id,
-            type: node.type,
-            data: node.data,
-          })),
+            // Send all current nodes
+            nodes: nodes.map((node) => ({
+              id: node.id,
+              type: node.type,
+              data: node.data,
+            })),
 
-          // Send the current React Flow connections
-          edges: edges.map((edge) => ({
-            id: edge.id,
-            source: edge.source,
-            target: edge.target,
-            sourceHandle: edge.sourceHandle,
-          })),
-        }),
+            // Send all current connections
+            edges: edges.map((edge) => ({
+              id: edge.id,
+              source: edge.source,
+              target: edge.target,
+              sourceHandle:
+                edge.sourceHandle,
+            })),
+          }),
+        }
+      );
+
+      // Check whether the request succeeded
+      if (!response.ok) {
+        console.log(
+          "Workflow request failed"
+        );
+
+        setAiDecision("Workflow failed");
+
+        return;
       }
-    );
 
-    // Check if the request was successful
-    if (!response.ok) {
-      console.log("Workflow request failed");
+      // Read the API response
+      await response.json();
+
+      // Give Inngest time to execute
+      await new Promise((resolve) =>
+        setTimeout(resolve, 5000)
+      );
+
+      // Get the workflow results
+      const resultResponse = await fetch(
+        "http://localhost:3000/api/workflow-result"
+      );
+
+      // Check whether the results request succeeded
+      if (!resultResponse.ok) {
+        setAiDecision("Result request failed");
+
+        return;
+      }
+
+      // Convert the response to JavaScript data
+      const decisionData =
+        await resultResponse.json();
+
+      console.log(
+        "Workflow results:",
+        decisionData
+      );
+
+      // Get all nodes that produced an AI decision
+      const executedNodes = Object.keys(
+        decisionData
+      );
+
+      // Stop if there are no results
+      if (executedNodes.length === 0) {
+        console.log(
+          "No workflow results received"
+        );
+
+        setAiDecision("No result");
+
+        return;
+      }
+
+      // Display the execution order
+      setExecutionLog(executedNodes);
+
+      // Save this run to execution history
+      setExecutionHistory((currentHistory) => [
+        ...currentHistory,
+        executedNodes,
+      ]);
+
+      // Get Node 1's decision
+      const firstDecision =
+        decisionData["1"]?.decision;
+
+      // Display Node 1's decision
+      if (firstDecision) {
+        setAiDecision(firstDecision);
+      }
+
+      // Update every node that executed
+      setNodes((currentNodes) =>
+        currentNodes.map((node) => {
+          // Get this node's result
+          const result =
+            decisionData[node.id];
+
+          // Leave nodes without results unchanged
+          if (!result) {
+            return node;
+          }
+
+          // Add the AI decision to the node
+          return {
+            ...node,
+
+            data: {
+              ...node.data,
+              decision: result.decision,
+            },
+          };
+        })
+      );
+
+      // Get the last executed decision node
+      const lastDecisionNodeId =
+        executedNodes[
+          executedNodes.length - 1
+        ];
+
+      // Get its decision
+      const lastDecision =
+        decisionData[
+          lastDecisionNodeId
+        ]?.decision;
+
+      // Find the edge selected by the AI
+      const finalEdge = edges.find(
+        (edge) => {
+          return (
+            edge.source ===
+              lastDecisionNodeId &&
+            edge.sourceHandle ===
+              lastDecision?.toLowerCase()
+          );
+        }
+      );
+
+      // Highlight the selected destination
+      if (finalEdge) {
+        setActiveNode(finalEdge.target);
+
+        // Highlight the selected edge
+        setActiveEdge(finalEdge.id);
+      } else {
+        // If there is no outgoing edge,
+        // highlight the final decision node
+        setActiveNode(
+          lastDecisionNodeId
+        );
+      }
+
+      console.log(
+        "Last decision node:",
+        lastDecisionNodeId
+      );
+
+      console.log(
+        "Final workflow node:",
+        finalEdge?.target
+      );
+
+      console.log(
+        "Execution order:",
+        executedNodes
+      );
+    } catch (error) {
+      // Handle unexpected errors
+      console.error(
+        "Workflow test failed:",
+        error
+      );
 
       setAiDecision("Workflow failed");
-
-      return;
     }
-
-    // Read the response from Next.js
-    await response.json();
-
-    // Give Inngest time to execute the workflow
-    await new Promise((resolve) =>
-      setTimeout(resolve, 5000)
-    );
-
-    // Get the results produced by the workflow
-    const resultResponse = await fetch(
-      "http://localhost:3000/api/workflow-result"
-    );
-
-    // Convert the response into JavaScript data
-    const decisionData =
-      await resultResponse.json();
-
-    console.log(
-      "Workflow results:",
-      decisionData
-    );
-
-    // Get the IDs of all nodes that produced
-    // an AI decision
-    const executedNodes = Object.keys(
-      decisionData
-    );
-
-    // Stop if no results were received
-    if (executedNodes.length === 0) {
-      console.log(
-        "No workflow results received"
-      );
-
-      setAiDecision("No result");
-
-      return;
-    }
-
-    // Display the decision nodes that actually executed
-    setExecutionLog(executedNodes);
-
-    // Get Node 1's decision
-    const firstDecision =
-      decisionData["1"]?.decision;
-
-    // Display the first AI decision
-    if (firstDecision) {
-      setAiDecision(firstDecision);
-    }
-
-    // Update every node that received an AI decision
-    setNodes((currentNodes) =>
-      currentNodes.map((node) => {
-        // Look for a result for this node
-        const result =
-          decisionData[node.id];
-
-        // If this node did not execute,
-        // leave it unchanged
-        if (!result) {
-          return node;
-        }
-
-        // Add the AI decision to the node
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            decision: result.decision,
-          },
-        };
-      })
-    );
-
-    // Get the last node that produced an AI decision
-    const lastDecisionNodeId =
-      executedNodes[
-        executedNodes.length - 1
-      ];
-
-    // Get the decision made by that node
-    const lastDecision =
-      decisionData[lastDecisionNodeId]?.decision;
-
-    // Find the edge selected by the AI decision
-    const finalEdge = edges.find((edge) => {
-      return (
-        edge.source === lastDecisionNodeId &&
-        edge.sourceHandle ===
-          lastDecision?.toLowerCase()
-      );
-    });
-
-    // If the AI selected an outgoing edge
-    if (finalEdge) {
-      // Highlight the node the workflow moves to
-      setActiveNode(finalEdge.target);
-
-      // Highlight the selected edge
-      setActiveEdge(finalEdge.id);
-    } else {
-      // If there is no outgoing edge,
-      // keep the last decision node highlighted
-      setActiveNode(lastDecisionNodeId);
-    }
-
-    console.log(
-      "Last decision node:",
-      lastDecisionNodeId
-    );
-
-    console.log(
-      "Final workflow node:",
-      finalEdge?.target
-    );
-
-    console.log(
-      "Execution order:",
-      executedNodes
-    );
   };
 
   return (
     <div
       style={{
+        // Use all available width
         width: "100%",
-        height: "800px",
+
+        // Use all available height from page.tsx
+        height: "100%",
+
+        // React Flow and the controls can overlap
+        // without pushing the canvas down
+        position: "relative",
+
+        // Prevent the page from creating another scrollbar
+        overflow: "hidden",
       }}
     >
-      {/* Add a new decision node */}
-      <button
-        onClick={addNode}
+      {/* Top-left workflow controls */}
+      <div
         style={{
-          margin: "20px 10px 10px 20px",
-          padding: "10px 20px",
-          cursor: "pointer",
+          position: "absolute",
+          top: "12px",
+          left: "12px",
+
+          // Put the controls above React Flow
+          zIndex: 10,
+
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+
+          // Allow controls to wrap on smaller screens
+          flexWrap: "wrap",
+
+          padding: "10px",
+
+          background:
+            "rgba(255, 255, 255, 0.95)",
+
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+
+          boxShadow:
+            "0 2px 8px rgba(0, 0, 0, 0.08)",
         }}
       >
-        Add Node
-      </button>
-
-      {/* Test the AI workflow */}
-      <button
-        onClick={testAI}
-        style={{
-          margin: "20px 10px 10px 0",
-          padding: "10px 20px",
-          cursor: "pointer",
-        }}
-      >
-        Test AI
-      </button>
-
-      {/* Display the latest AI decision */}
-      <p
-        style={{
-          marginLeft: "20px",
-        }}
-      >
-        AI Decision:{" "}
-        <strong>{aiDecision}</strong>
-      </p>
-
-      {/* Display the execution order */}
-      <p
-        style={{
-          marginLeft: "20px",
-        }}
-      >
-        Execution:{" "}
-        <strong>
-          {executionLog.length > 0
-            ? executionLog.join(" → ")
-            : "Not started"}
-        </strong>
-      </p>
-
-      {/* Prompt editor */}
-      {selectedNode && (
-        <div
+        {/* Add node button */}
+        <button
+          onClick={addNode}
           style={{
-            margin: "20px",
-            padding: "15px",
-            border: "1px solid #ccc",
-            borderRadius: "8px",
-            maxWidth: "400px",
+            padding: "8px 14px",
+            cursor: "pointer",
           }}
         >
+          Add Node
+        </button>
+
+        {/* Test AI button */}
+        <button
+          onClick={testAI}
+          style={{
+            padding: "8px 14px",
+            cursor: "pointer",
+          }}
+        >
+          Test AI
+        </button>
+
+        {/* Current AI decision */}
+        <span
+          style={{
+            fontSize: "13px",
+          }}
+        >
+          AI:{" "}
+          <strong>{aiDecision}</strong>
+        </span>
+
+        {/* Current execution */}
+        <span
+          style={{
+            fontSize: "13px",
+          }}
+        >
+          Execution:{" "}
           <strong>
-            Edit Decision Prompt
+            {executionLog.length > 0
+              ? executionLog.join(" → ")
+              : "Not started"}
           </strong>
+        </span>
+      </div>
 
-          <textarea
-            value={String(
-              nodes.find(
-                (node) =>
-                  node.id === selectedNode
-              )?.data.prompt || ""
-            )}
-            onChange={(event) => {
-              const newPrompt =
-                event.target.value;
+      {/* Right-side information panel */}
+      <div
+        style={{
+          position: "absolute",
+          top: "12px",
+          right: "12px",
 
-              // Update the selected node's prompt
-              setNodes((currentNodes) =>
-                currentNodes.map((node) => {
-                  if (
-                    node.id === selectedNode
-                  ) {
-                    return {
-                      ...node,
-                      data: {
-                        ...node.data,
-                        prompt: newPrompt,
-                      },
-                    };
-                  }
+          // Keep the panel above React Flow
+          zIndex: 10,
 
-                  return node;
-                })
-              );
-            }}
+          width: "280px",
+          maxWidth: "calc(100% - 24px)",
+
+          // Prevent the panel from becoming taller
+          // than the available browser window
+          maxHeight: "calc(100% - 24px)",
+
+          // Allow the panel itself to scroll
+          overflowY: "auto",
+
+          padding: "14px",
+
+          background:
+            "rgba(255, 255, 255, 0.96)",
+
+          border: "1px solid #ddd",
+          borderRadius: "8px",
+
+          boxShadow:
+            "0 2px 10px rgba(0, 0, 0, 0.1)",
+        }}
+      >
+        {/* Prompt editor */}
+        {selectedNode && (
+          <div
             style={{
-              width: "100%",
-              minHeight: "100px",
-              marginTop: "10px",
+              marginBottom: "15px",
             }}
-          />
-        </div>
-      )}
+          >
+            <strong>
+              Edit Decision Prompt
+            </strong>
 
-      {/* React Flow canvas */}
+            <textarea
+              value={String(
+                nodes.find(
+                  (node) =>
+                    node.id ===
+                    selectedNode
+                )?.data.prompt || ""
+              )}
+              onChange={(event) => {
+                const newPrompt =
+                  event.target.value;
+
+                // Update the selected node's prompt
+                setNodes((currentNodes) =>
+                  currentNodes.map(
+                    (node) => {
+                      if (
+                        node.id ===
+                        selectedNode
+                      ) {
+                        return {
+                          ...node,
+
+                          data: {
+                            ...node.data,
+                            prompt: newPrompt,
+                          },
+                        };
+                      }
+
+                      return node;
+                    }
+                  )
+                );
+              }}
+              style={{
+                // Make the textarea fill the panel
+                width: "100%",
+
+                // Give enough space to edit the prompt
+                minHeight: "80px",
+
+                marginTop: "8px",
+
+                // Make sizing predictable
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+        )}
+
+        {/* Execution history */}
+        {executionHistory.length > 0 && (
+          <div>
+            <strong>
+              Execution History
+            </strong>
+
+            {executionHistory.map(
+              (execution, index) => (
+                <div
+                  key={index}
+                  style={{
+                    marginTop: "8px",
+                    padding: "9px",
+
+                    background: "#fafafa",
+
+                    border:
+                      "1px solid #ddd",
+
+                    borderRadius: "6px",
+                  }}
+                >
+                  {/* Execution number */}
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      marginBottom: "4px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Run {index + 1}
+                  </div>
+
+                  {/* Nodes visited */}
+                  <div
+                    style={{
+                      fontSize: "12px",
+                    }}
+                  >
+                    {execution.join(
+                      " → "
+                    )}
+                  </div>
+
+                  {/* Completion status */}
+                  <div
+                    style={{
+                      marginTop: "4px",
+                      fontSize: "11px",
+                      color: "green",
+                    }}
+                  >
+                    Completed
+                  </div>
+                </div>
+              )
+            )}
+          </div>
+        )}
+
+        {/* Show this when no node is selected */}
+        {!selectedNode &&
+          executionHistory.length ===
+            0 && (
+            <div
+              style={{
+                fontSize: "13px",
+                color: "#666",
+              }}
+            >
+              Click an AI decision node
+              to edit its prompt.
+            </div>
+          )}
+      </div>
+
+      {/* Full-screen React Flow canvas */}
       <ReactFlow
+        // Make React Flow use the entire available container
+        style={{
+          width: "100%",
+          height: "100%",
+        }}
+
+        // Display our workflow nodes
         nodes={nodes.map((node) => ({
           ...node,
 
-          // Highlight the final workflow node
+          // Highlight the active destination node
           style:
             node.id === activeNode
               ? {
-                  border: "3px solid green",
+                  border:
+                    "3px solid green",
                   background: "#eaffea",
                 }
               : undefined,
         }))}
+
+        // Display our workflow edges
         edges={edges.map((edge) => ({
           ...edge,
 
@@ -601,14 +877,27 @@ export default function WorkflowCanvas() {
           animated:
             edge.id === activeEdge,
         }))}
+
+        // Handle node movement
         onNodesChange={onNodesChange}
+
+        // Handle edge changes
         onEdgesChange={onEdgesChange}
+
+        // Handle new connections
         onConnect={onConnect}
+
+        // Allow nodes to be selected
         onNodeClick={(_, node) => {
-          // Select a node when the user clicks it
+          // Store the selected node
           setSelectedNode(node.id);
         }}
+
+        // Tell React Flow about our custom node
         nodeTypes={nodeTypes}
+
+        // Automatically fit the workflow inside
+        // the available canvas
         fitView
       />
     </div>
